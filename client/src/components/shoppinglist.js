@@ -1,8 +1,8 @@
 import React from 'react';
-import {Button,Card,Modal,ModalHeader,ModalBody,Form, FormGroup, Label, Input} from 'reactstrap';
+import {Button,Modal,ModalHeader,ModalBody,Form, FormGroup, Label, Input} from 'reactstrap';
 import {connect} from 'react-redux';
 import {getItems,deleteItem,updateItem} from '../actions/itemActions';
-import EditModal from './editmodal';
+
 
 class ShoppingList extends React.Component{
     state={
@@ -17,6 +17,7 @@ class ShoppingList extends React.Component{
     }
 
     onDeleteClick = (id) =>{
+        console.log(id)
         this.props.deleteItem(id);  //calling the action
     }
 
@@ -26,9 +27,9 @@ class ShoppingList extends React.Component{
         });
       };
 
-    onEditClick = (id) =>{
-        this.toggle(); 
-        this.setState({id:id})
+    onEditClick = (id,name,email,count) =>{
+        console.log(id)
+        this.setState({id,name,email,count},() => { this.toggle(); })
     }
 
     onChangeName = (e) => {
@@ -65,7 +66,7 @@ class ShoppingList extends React.Component{
 
     render(){
         const {items}=this.props.item;
-        console.log(items);
+        //console.log(items);
         return(
             /*<div className="container">
                 <CardDeck>
@@ -93,7 +94,7 @@ class ShoppingList extends React.Component{
             { 
                 items.map(({_id,name,email,count}) => {
             return (
-                <section>
+                <section key={_id}>
                  {
                      (this.state.modal)?<Modal isOpen={this.state.modal} toggle={this.toggle}>
                      <ModalHeader toggle={this.toggle}>Edit User Details</ModalHeader>
@@ -102,15 +103,15 @@ class ShoppingList extends React.Component{
                                  <FormGroup>
                                  <Label for="item">User Detail</Label>
                                  <Input type="text" name="name" id="item" onChange={this.onChangeName}
-                                 placeholder={name} defaultValue={name}
+                                 placeholder="user-name" value={this.state.name}
                                  />
                                  <Input type="text" name="email" id="email" onChange={this.onChangeEmail}
-                                 placeholder={email} defaultValue={email}
+                                 placeholder="user@mail.com" value={this.state.email}
                                  />
                                  <Input type="text" name="Article count" id="count" onChange={this.onChangeCount}
-                                 placeholder={count} defaultValue={count}
+                                 placeholder="article-count" value={this.state.count}
                                  />
-                                 <Button color="info" style={{margin:'0.5rem'}}>Update</Button>
+                                 <Button type="submit" color="info" style={{margin:'0.5rem'}}>Update</Button>
                                  </FormGroup>
                              </Form>    
                          </ModalBody>
@@ -136,7 +137,7 @@ class ShoppingList extends React.Component{
                                     onClick={this.onDeleteClick.bind(this,_id)}>
                                 Remove User</Button>
                     <Button className="edit-btn" color="warning" size="sm"
-                                    onClick={this.onEditClick.bind(this,_id)}>
+                                    onClick={this.onEditClick.bind(this,_id,name,email,count)}>
                                 Edit</Button>         
                 </div>
                 </div>

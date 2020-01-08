@@ -7,7 +7,7 @@ const Item=require('../models/Item');
 //'Get' request to show all items
 router.get('/',(req,res)=>{
     Item.find()
-        .sort({date:1})
+        .sort({count:-1})
         .then((items)=>res.json(items));  //responding back with the items
 });
 

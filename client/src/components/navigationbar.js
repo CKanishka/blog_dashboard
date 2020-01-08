@@ -16,7 +16,7 @@ class NavigationBar extends React.Component {
             <div>
                 
                 <Navbar color="dark" dark>
-                    <NavbarBrand href="/" className="mr-auto class animated infinite pulse delay-5s">Dashboard</NavbarBrand>
+                    <NavbarBrand href="/" className="mr-auto animated infinite pulse delay-5s">My Blog's Dashboard</NavbarBrand>
                     <NavbarToggler onClick={this.toggle} className="mr-2" />
                     <Collapse isOpen={this.state.collapsed} navbar>
                     <Nav navbar>
