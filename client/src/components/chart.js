@@ -98,23 +98,18 @@ class Chart extends Component{
     //     // })
     //     console.log(this.props.item)
     //   }
-    componentDidMount(){
-        this.props.getArticleCount();
-        this.props.getGenreCount();
-    }
-    state={
-        toggle:true,
-    }
       render(){
         const{items,articlecount,genrecount}=this.props.item
-        if(this.state.toggle && articlecount && genrecount){
+        if(articlecount && genrecount){
+            chart1_data=[]
+            chart2_data=[]
             articlecount.slice(0,5).map(({_id,count})=> 
                 chart1_data.push({"label":_id,"value":count})
                 )
             genrecount.map(({_id,count})=> 
                 chart2_data.push({"label":_id,"value":count})
             )    
-            this.setState({toggle:!this.state.toggle})      
+            // this.setState({toggle:!this.state.toggle})      
         }
         let data={...chartConfigs,dataSource:{ "chart": {
             "caption": "Top Writers",

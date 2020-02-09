@@ -1,7 +1,7 @@
 import React from 'react';
 import {Button,Modal,ModalHeader,ModalBody,Form, FormGroup, Label, Input} from 'reactstrap';
 import {connect} from 'react-redux';
-import {getItems,deleteItem,updateItem} from '../actions/itemActions';
+import {getItems,deleteItem,updateItem,getArticleCount,getGenreCount} from '../actions/itemActions';
 
 
 class ShoppingList extends React.Component{
@@ -14,6 +14,8 @@ class ShoppingList extends React.Component{
     }
     componentDidMount(){
         this.props.getItems();      //calling the action
+        this.props.getArticleCount();
+        this.props.getGenreCount();
     }
 
     onDeleteClick = (id) =>{
@@ -155,4 +157,4 @@ class ShoppingList extends React.Component{
 const mapStateToProps = (state) => ({
     item:state.item   //from reducer
 });
-export default connect(mapStateToProps,{getItems,deleteItem,updateItem})(ShoppingList);
+export default connect(mapStateToProps,{getItems,deleteItem,updateItem,getArticleCount,getGenreCount})(ShoppingList);
