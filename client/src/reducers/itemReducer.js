@@ -13,6 +13,18 @@ export default function(state=initialState,action){
                 items:action.payload,
                 loading:false
             }
+        case 'get-articlecount':
+            return{
+                ...state,
+                articlecount:action.payload,
+                loading:false
+            }
+        case 'get-genrecount':
+            return{
+                ...state,
+                genrecount:action.payload,
+                loading:false
+            }
         case 'delete-item':
             return{
                 ...state,

@@ -1,11 +1,11 @@
 import axios from 'axios';
 
-const PORT = process.env.PORT || 5000
-const baseURL = "/api"
+
+const baseURL = "https://blogplanet.herokuapp.com/api"
 export const getItems = () => dispatch => {
     dispatch(itemsLoading());
     axios
-        .get(`${baseURL}`)
+        .get(`${baseURL}/user`)
         .then(res=>{
             dispatch({
                 type:'get-items',
@@ -15,8 +15,34 @@ export const getItems = () => dispatch => {
 
 };
 
+export const getArticleCount = () => dispatch => {
+    dispatch(itemsLoading());
+    axios
+        .get(`${baseURL}/articlecount`)
+        .then(res=>{
+            dispatch({
+                type:'get-articlecount',
+                payload:res.data
+            });
+        })
+
+};
+
+export const getGenreCount = () => dispatch => {
+    dispatch(itemsLoading());
+    axios
+        .get(`${baseURL}/genrecount`)
+        .then(res=>{
+            dispatch({
+                type:'get-genrecount',
+                payload:res.data
+            });
+        })
+
+};
+
 export const deleteItem = id => dispatch => {
-    axios.delete(`${baseURL}/${id}`).then(res =>
+    axios.delete(`${baseURL}/user/${id}`).then(res =>
       dispatch({
         type: 'delete-item',
         payload: id
@@ -28,7 +54,7 @@ export const deleteItem = id => dispatch => {
 
 export const addItem = (item) =>dispatch=> {
     axios
-        .post(`${baseURL}`,item)
+        .post(`${baseURL}/user`,item)
         .then(res=>{
             dispatch({
                 type:'add-item',
@@ -40,7 +66,7 @@ export const addItem = (item) =>dispatch=> {
 
 export const updateItem = (item,id) =>dispatch=> {
     axios
-        .put(`${baseURL}/${id}`,item)
+        .put(`${baseURL}/user/${id}`,item)
         .then(res=>{
             dispatch({
                 type:'update-item',

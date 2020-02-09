@@ -1,6 +1,6 @@
 import React,{Component} from 'react';
 import {connect} from 'react-redux';
-import {getItems,deleteItem,updateItem} from '../actions/itemActions';
+import {getItems,getArticleCount,getGenreCount} from '../actions/itemActions';
 // Step 2 - Including the react-fusioncharts component
 import ReactFC from 'react-fusioncharts';
 // Step 3 - Including the fusioncharts library
@@ -89,7 +89,7 @@ const chartConfigs2 = {
 };
 
 let chart1_data=[]
-
+let chart2_data=[]
 class Chart extends Component{
     // componentDidMount(){
     //     this.props.getItems(); 
@@ -98,31 +98,50 @@ class Chart extends Component{
     //     // })
     //     console.log(this.props.item)
     //   }
-     componentWillUpdate(){
-         chart1_data=[]
-     }
+    componentDidMount(){
+        this.props.getArticleCount();
+        this.props.getGenreCount();
+    }
+    state={
+        toggle:true,
+    }
       render(){
-        const{items}=this.props.item
-        if(items){
-            items.slice(0,5).map(({name,count})=> 
-                chart1_data.push({"label":name,"value":count})
+        const{items,articlecount,genrecount}=this.props.item
+        if(this.state.toggle && articlecount && genrecount){
+            articlecount.slice(0,5).map(({_id,count})=> 
+                chart1_data.push({"label":_id,"value":count})
                 )
-            //console.log(chart1_data)    
+            genrecount.map(({_id,count})=> 
+                chart2_data.push({"label":_id,"value":count})
+            )    
+            this.setState({toggle:!this.state.toggle})      
         }
         let data={...chartConfigs,dataSource:{ "chart": {
             "caption": "Top Writers",
             "startingAngle": "310",
-            "defaultCenterLabel": "Top Genres",
+            "defaultCenterLabel": "Top Writers",
             "showTooltip": "0",
             "decimals": "0",
             "theme": "fusion"
           },"data":chart1_data}}
+
+        let data2={...chartConfigs2,dataSource: { 
+            // Chart Configuration 
+            "chart": {
+              "caption": "Top Genres",
+              "startingAngle": "310",
+              "defaultCenterLabel": "Top Genres",
+              "showTooltip": "0",
+              "decimals": "0",
+              "theme": "fusion"
+            },"data":chart2_data}}
+
           return(
             <div className="row card__box">
             <ReactFC
             {...data}/>
             <ReactFC
-            {...chartConfigs2}/>
+            {...data2}/>
             </div>  
           );
       }
@@ -130,4 +149,4 @@ class Chart extends Component{
 const mapStateToProps = (state) => ({
     item:state.item   //from reducer
 });
-export default connect(mapStateToProps,{getItems,deleteItem,updateItem})(Chart);
+export default connect(mapStateToProps,{getItems,getArticleCount,getGenreCount})(Chart);
