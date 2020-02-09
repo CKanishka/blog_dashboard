@@ -2,7 +2,7 @@ const express=require('express');
 const bodyParser=require('body-parser');
 const mongoose=require('mongoose');
 const cors = require('cors');
-const mongoURI=process.env.MONGODB_URI||'mongodb://kc:kc12345@ds261430.mlab.com:61430/users'
+const mongoURI=process.env.MONGODB_URI||'mongodb://kc:kc12345@ds047197.mlab.com:47197/blogplanet'
 
 const app=express(); //initializing express
 
