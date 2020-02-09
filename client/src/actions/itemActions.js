@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 
-const baseURL = "https://blogplanet.herokuapp.com/api"
+const baseURL = "/"
 export const getItems = () => dispatch => {
     dispatch(itemsLoading());
     axios
