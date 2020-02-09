@@ -1,0 +1,9 @@
+body {
+    margin: 0;
+    padding: 0;
+    background:linear-gradient(-125deg,
+    rgb(179, 230, 250) 0%,
+    rgb(23, 152, 226) 50%,
+    rgb(246, 120, 162) 50%,
+    rgb(215, 128, 236) 100% );
+  }

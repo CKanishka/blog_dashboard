@@ -9,7 +9,7 @@ const app=express(); //initializing express
 const items=require('./routes/api')   //importing the route file
 
 //connecting to mongo
-mongoose.connect(mongoURI)
+mongoose.connect(mongoURI,{useNewUrlParser:true})
     .then(()=>console.log("MongoDB Connected"))
     .catch((err)=>console.log(err));
 
