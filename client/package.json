@@ -1,6 +1,6 @@
 {
-  "name": "client",
-  "version": "0.1.0",
+  "name": "blogplanet-dashboard-ui",
+  "version": "1.0.0",
   "private": true,
   "dependencies": {
     "animate.css": "^3.7.2",
