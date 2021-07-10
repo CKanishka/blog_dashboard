@@ -1,9 +1,7 @@
 For Server side-
 >npm init
->npm i express mongoose body-parser nodemon
+>npm install
 >change start in script of package.json to "nodemon server.js"
 For Client side-
 >Inside the client folder run npm init
->npm i bootstrap reactstrap uuid react-transition-group
->npm i redux react-redux redux-thunk
->npm i animate.css
+>npm install

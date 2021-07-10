@@ -1,31 +1,18 @@
-const express=require('express');
-const bodyParser=require('body-parser');
-const mongoose=require('mongoose');
-const cors = require('cors');
-const mongoURI=process.env.MONGODB_URI||'mongodb://kc:kc12345@ds047197.mlab.com:47197/blogplanet'
+const express = require("express");
+const bodyParser = require("body-parser");
+const cors = require("cors");
+require("dotenv").config();
 
-const app=express(); //initializing express
-
-const items=require('./routes/api')   //importing the route file
-
-//connecting to mongo
-mongoose.connect(mongoURI,{useNewUrlParser:true})
-    .then(()=>console.log("MongoDB Connected"))
-    .catch((err)=>console.log(err));
+const app = express(); //initializing express
 
 app.use(cors());
 //applying middleware bodyparser
 app.use(bodyParser.json());
 
-if(process.env.NODE_ENV === "production"){
-    app.use(express.static("client/build"))
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static("client/build"));
 }
 
+const port = process.env.PORT || 5000;
 
-//using route
-app.use('/api',items); 
-
-const port =process.env.PORT || 5000;
-
-app.listen(port,()=>console.log(`Server running on port: ${port}`))
-
+app.listen(port, () => console.log(`Server running on port: ${port}`));
