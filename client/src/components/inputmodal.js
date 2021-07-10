@@ -1,87 +1,108 @@
-import React from 'react';
-import {connect} from 'react-redux';
-import {addItem} from '../actions/itemActions';
-import { Modal,ModalHeader,ModalBody,Button, Form, FormGroup, Label, Input} from 'reactstrap';
+import React from "react";
+import { connect } from "react-redux";
+import { addItem, updateItem } from "../actions/itemActions";
+import {
+  Modal,
+  ModalHeader,
+  ModalBody,
+  Button,
+  Form,
+  FormGroup,
+  Label,
+  Input,
+} from "reactstrap";
 
+class InputModal extends React.Component {
+  state = {
+    name: "",
+    email: "",
+    password: "",
+  };
 
-class InputModal extends React.Component{
-    state={
-        modal:false,
-        name:" ",
-        email:" ",
-        count:" "
+  onChangeName = (e) => {
+    this.setState({
+      name: e.target.value,
+    });
+  };
+
+  onChangeEmail = (e) => {
+    this.setState({
+      email: e.target.value,
+    });
+  };
+
+  onChangePassword = (e) => {
+    this.setState({
+      password: e.target.value,
+    });
+  };
+
+  onSubmit = (e) => {
+    e.preventDefault();
+    const { name, email, password } = this.state;
+    const newItem = {
+      name: name || this.props.user.name,
+      email: email || this.props.user.email,
+      password,
     };
+    this.props.user
+      ? this.props.updateItem(newItem, this.props.user._id)
+      : this.props.addItem(newItem); //calling the action
 
-    toggle = () => {
-        this.setState({
-          modal: !this.state.modal
-        });
-      };
+    this.props.toggleShowModal();
+  };
 
-    onChangeName = (e) => {
-        this.setState({
-            name:e.target.value
-        });
-    };
-
-    onChangeEmail = (e) => {
-        this.setState({
-            email:e.target.value
-        });
-    };
-
-    onChangeCount = (e) => {
-        this.setState({
-            count:e.target.value
-        });
-    };
-
-    onSubmit = (e) => {
-        e.preventDefault();
-
-        const newItem = {
-            name:this.state.name,
-            email:this.state.email,
-            count:this.state.count
-        };
-
-        this.props.addItem(newItem);      //calling the action
-
-        this.toggle();
-    };
-
-    render(){
-        return(
-            <div>
-                <Button className="add-btn" 
-                color="danger" 
-                style={{marginBotom:'2rem'}}
-                onClick={this.toggle}>
-                    Add User 
-                </Button>
-                <Modal isOpen={this.state.modal} toggle={this.toggle}>
-                    <ModalHeader toggle={this.toggle}>Add new users</ModalHeader>
-                        <ModalBody>
-                            <Form onSubmit={this.onSubmit}>
-                                <FormGroup>
-                                <Label for="item">User Details</Label>
-                                <Input type="text" name="name" id="item" 
-                                placeholder="Name" 
-                                onChange={this.onChangeName}/>
-                                <Input type="text" name="email" id="email" 
-                                placeholder="email@.com" 
-                                onChange={this.onChangeEmail}/>
-                                <Input type="text" name="Article count" id="count" 
-                                placeholder="No. of Articles" 
-                                onChange={this.onChangeCount}/>
-                                <Button color="info" style={{margin:'0.5rem'}}>Add +</Button>
-                                </FormGroup>
-                            </Form>    
-                        </ModalBody>
-                </Modal>
-            </div>     
-        );
-    }
+  render() {
+    const { showModal, toggleShowModal, user } = this.props;
+    return (
+      <Modal isOpen={showModal} toggle={toggleShowModal}>
+        <ModalHeader toggle={toggleShowModal}>User Details</ModalHeader>
+        <ModalBody>
+          <Form onSubmit={this.onSubmit}>
+            <FormGroup>
+              <Label for="name">Name</Label>
+              <Input
+                type="text"
+                name="name"
+                id="name"
+                placeholder="Name"
+                defaultValue={user ? user.name : ""}
+                onChange={this.onChangeName}
+              />
+              <Label for="email" className="mt-2">
+                Email Id
+              </Label>
+              <Input
+                type="text"
+                name="email"
+                id="email"
+                placeholder="user@domain"
+                defaultValue={user ? user.email : ""}
+                onChange={this.onChangeEmail}
+              />
+              {!this.props.user && (
+                <React.Fragment>
+                  <Label for="password" className="mt-2">
+                    Password
+                  </Label>
+                  <Input
+                    type="password"
+                    name="password"
+                    id="password"
+                    placeholder="password"
+                    onChange={this.onChangePassword}
+                  />
+                </React.Fragment>
+              )}
+              <Button color="info" className="d-flex ml-auto my-2">
+                {this.props.user ? "Update" : "Add +"}
+              </Button>
+            </FormGroup>
+          </Form>
+        </ModalBody>
+      </Modal>
+    );
+  }
 }
 
-export default connect(null,{addItem})(InputModal);
+export default connect(null, { addItem, updateItem })(InputModal);
