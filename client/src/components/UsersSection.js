@@ -9,7 +9,7 @@ import {
 } from "../actions/itemActions";
 import UserItem from "./UserItem";
 
-class UserList extends React.Component {
+class UsersSection extends React.Component {
   componentDidMount() {
     this.props.getItems(); //calling the action
     this.props.getArticleCount();
@@ -48,4 +48,4 @@ export default connect(mapStateToProps, {
   updateItem,
   getArticleCount,
   getGenreCount,
-})(UserList);
+})(UsersSection);

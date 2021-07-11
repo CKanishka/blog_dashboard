@@ -2,8 +2,8 @@ import React, { Component } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import { Button } from "reactstrap";
-import UserList from "./components/UserList";
-import InputModal from "./components/InputModal";
+import UsersSection from "./components/UsersSection";
+import UserFormModal from "./components/UserFormModal";
 import Chart from "./components/Chart";
 import { Provider } from "react-redux";
 import store from "./store";
@@ -39,12 +39,12 @@ class App extends Component {
             <Button color="info" className="m-2" onClick={this.addUser}>
               Add User
             </Button>
-            <InputModal
+            <UserFormModal
               showModal={this.state.showModal}
               toggleShowModal={this.toggleShowModal}
               user={this.state.user}
             />
-            <UserList toggleShowModal={this.toggleShowModal} />
+            <UsersSection toggleShowModal={this.toggleShowModal} />
           </div>
         </div>
       </Provider>
