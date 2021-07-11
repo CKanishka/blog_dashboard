@@ -2,12 +2,12 @@ import React, { Component } from "react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import { Button } from "reactstrap";
-import NavigationBar from "./components/NavigationBar";
 import UserList from "./components/UserList";
 import InputModal from "./components/InputModal";
 import Chart from "./components/Chart";
 import { Provider } from "react-redux";
 import store from "./store";
+import Header from "./components/Header";
 
 class App extends Component {
   state = {
@@ -30,7 +30,7 @@ class App extends Component {
     return (
       <Provider store={store}>
         <div className="App">
-          <NavigationBar />
+          <Header />
           <div className="container">
             <Chart />
           </div>
