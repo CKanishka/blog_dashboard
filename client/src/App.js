@@ -4,7 +4,7 @@ import "./App.css";
 import { Button } from "reactstrap";
 import UsersSection from "./components/UsersSection";
 import UserFormModal from "./components/UserFormModal";
-import Chart from "./components/Chart";
+import ChartContainer from "./components/ChartContainer";
 import { Provider } from "react-redux";
 import store from "./store";
 import Header from "./components/Header";
@@ -32,7 +32,7 @@ class App extends Component {
         <div className="App">
           <Header />
           <div className="container">
-            <Chart />
+            <ChartContainer />
           </div>
           <hr />
           <div>
