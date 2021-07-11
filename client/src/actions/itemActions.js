@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const baseURL = process.env.REACT_APP_BASE_URL;
+const baseURL = process.env.REACT_APP_BASE_URL || 'https://blogplanet.herokuapp.com/api';
 
 export const getItems = () => (dispatch) => {
   dispatch(itemsLoading());
