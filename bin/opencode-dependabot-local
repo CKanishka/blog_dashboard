@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+alert_number="${1:?usage: bin/opencode-dependabot-local ALERT_NUMBER}"
+repo="${GITHUB_REPOSITORY:-CKanishka/blog_dashboard}"
+model="${OPENCODE_DEPENDABOT_MODEL:-openai/gpt-5.4-mini}"
+
+if [[ ! "${alert_number}" =~ ^[0-9]+$ ]]; then
+  echo "alert number must be numeric" >&2
+  exit 2
+fi
+
+if [[ -n "${DEPENDABOT_ALERTS_TOKEN:-}" ]]; then
+  token="${DEPENDABOT_ALERTS_TOKEN}"
+else
+  token="$(gh auth token)"
+fi
+
+mkdir -p .scratch
+mkdir -p .scratch/npm-bin
+cat > .scratch/npm-bin/npm <<'SH'
+#!/usr/bin/env bash
+exec npx -y npm@8.19.4 "$@"
+SH
+chmod +x .scratch/npm-bin/npm
+export PATH="${PWD}/.scratch/npm-bin:${PATH}"
+
+GH_TOKEN="${token}" gh api \
+  "repos/${repo}/dependabot/alerts/${alert_number}" | jq -s '.' > .scratch/dependabot-alerts.json
+
+package="$(jq -r '.[0].dependency.package.name' .scratch/dependabot-alerts.json)"
+state="$(jq -r '.[0].state' .scratch/dependabot-alerts.json)"
+patched_version="$(jq -r '.[0].security_vulnerability.first_patched_version.identifier // empty' .scratch/dependabot-alerts.json)"
+
+if [[ "${state}" != "open" || -z "${patched_version}" ]]; then
+  echo "alert must be open and have a patched version" >&2
+  exit 2
+fi
+
+opencode run \
+  --agent dependabot-fixer \
+  --model "${model}" \
+  "Prepare the npm Dependabot remediation described by .scratch/dependabot-alerts.json. The expected package is ${package} and alert number is ${alert_number}. Follow the dependabot-fixer agent fully. This is a local dry run. Do not commit, push, or create a PR."
+
+set +e
+bin/opencode-dependabot-validate "${package}" "${alert_number}"
+validation_status=$?
+set -e
+
+if [[ "${validation_status}" == "3" ]]; then
+  jq -r '.summary' .scratch/dependabot-result.json
+  exit 0
+fi
+
+exit "${validation_status}"

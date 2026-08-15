@@ -1,0 +1,227 @@
+name: OpenCode Dependabot remediation
+
+on:
+  schedule:
+    - cron: "17,47 * * * *"
+  workflow_dispatch:
+    inputs:
+      alert_number:
+        description: "Optional Dependabot alert number to process"
+        required: false
+        type: string
+  repository_dispatch:
+    types: [dependabot-alert]
+
+concurrency:
+  group: opencode-dependabot-remediation
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    if: ${{ vars.OPENCODE_DEPENDABOT_ENABLED == 'true' || github.event_name != 'schedule' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      matrix: ${{ steps.alerts.outputs.matrix }}
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: master
+          persist-credentials: false
+
+      - name: Discover unlinked npm alerts
+        id: alerts
+        env:
+          ALERT_NUMBER: ${{ github.event.inputs.alert_number || github.event.client_payload.alert_number || '' }}
+          DEPENDABOT_ALERTS_TOKEN: ${{ secrets.DEPENDABOT_ALERTS_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          matrix="$(bin/opencode-dependabot-discover "${ALERT_NUMBER}")"
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+
+  prepare:
+    needs: discover
+    if: ${{ needs.discover.outputs.matrix != '{"include":[]}' }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 16
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+
+      - name: Pin npm version
+        run: npm install --global npm@8.19.4
+
+      - name: Verify baseline
+        run: |
+          npm ci --ignore-scripts
+          npm --prefix client ci --ignore-scripts
+          node --check server.js
+          CI=true npm --prefix client test -- --watchAll=false
+          npm --prefix client run build
+
+      - name: Fetch Dependabot alert context
+        env:
+          ALERT_NUMBERS: ${{ matrix.alerts }}
+          DEPENDABOT_ALERTS_TOKEN: ${{ secrets.DEPENDABOT_ALERTS_TOKEN }}
+        run: |
+          mkdir -p .scratch
+          alerts_file="$(mktemp)"
+          IFS=',' read -ra alerts <<< "${ALERT_NUMBERS}"
+          for alert_number in "${alerts[@]}"; do
+            GH_TOKEN="${DEPENDABOT_ALERTS_TOKEN}" gh api \
+              "repos/${GITHUB_REPOSITORY}/dependabot/alerts/${alert_number}" >> "${alerts_file}"
+          done
+          jq -s '.' "${alerts_file}" > .scratch/dependabot-alerts.json
+          rm -f "${alerts_file}"
+
+      - name: Prepare dependency patch with OpenCode
+        uses: anomalyco/opencode/github@77fc88c8ade8e5a620ebbe1197f3a572d29ae91a
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+        with:
+          agent: dependabot-fixer
+          model: ${{ vars.OPENCODE_DEPENDABOT_MODEL || 'openai/gpt-5.4-mini' }}
+          use_github_token: true
+          prompt: |
+            Prepare the npm Dependabot remediation described by .scratch/dependabot-alerts.json.
+            The expected package is `${{ matrix.package }}` and alert numbers are `${{ matrix.alerts }}`.
+            Follow the dependabot-fixer agent fully. Do not commit, push, or create a PR.
+
+      - name: Validate prepared patch
+        env:
+          EXPECTED_PACKAGE: ${{ matrix.package }}
+          EXPECTED_ALERTS: ${{ matrix.alerts }}
+        run: bin/opencode-dependabot-validate "${EXPECTED_PACKAGE}" "${EXPECTED_ALERTS}"
+
+      - name: Package patch artifact
+        run: git diff --binary --output=.scratch/dependabot.patch
+
+      - name: Upload patch artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dependabot-${{ matrix.primary_alert }}
+          path: |
+            .scratch/dependabot-alerts.json
+            .scratch/dependabot-result.json
+            .scratch/dependabot-pr-body.md
+            .scratch/dependabot.patch
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    needs: [discover, prepare]
+    if: ${{ needs.prepare.result == 'success' }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Download validated patch
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dependabot-${{ matrix.primary_alert }}
+          path: .scratch
+
+      - name: Apply and revalidate patch
+        env:
+          EXPECTED_PACKAGE: ${{ matrix.package }}
+          EXPECTED_ALERTS: ${{ matrix.alerts }}
+        run: |
+          git apply .scratch/dependabot.patch
+          bin/opencode-dependabot-validate "${EXPECTED_PACKAGE}" "${EXPECTED_ALERTS}"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 16
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+
+      - name: Pin npm version
+        run: npm install --global npm@8.19.4
+
+      - name: Verify in clean publishing job
+        run: |
+          npm ci --ignore-scripts
+          npm --prefix client ci --ignore-scripts
+          node --check server.js
+          CI=true npm --prefix client test -- --watchAll=false
+          npm --prefix client run build
+          git diff --check
+
+      - name: Create branch, commit, and PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE: ${{ matrix.package }}
+          PRIMARY_ALERT: ${{ matrix.primary_alert }}
+        run: |
+          while IFS= read -r alert_url; do
+            linked_count="$(gh pr list \
+              --state all \
+              --search "${alert_url} in:body" \
+              --limit 20 \
+              --json state,mergedAt \
+              --jq 'map(select(.state == "OPEN" or .mergedAt != null)) | length')"
+            if [[ "${linked_count}" != "0" ]]; then
+              echo "Alert ${alert_url} is already linked to an open or merged PR."
+              exit 1
+            fi
+          done < <(jq -r '.[].html_url' .scratch/dependabot-alerts.json)
+
+          package_slug="$(printf '%s' "${PACKAGE}" | sed -E 's/^@//; s|/|-|g; s/[^a-z0-9.-]+/-/g; s/^-+//; s/-+$//')"
+          branch="dependabot-${PRIMARY_ALERT}-upgrade-${package_slug}"
+
+          if git ls-remote --exit-code --heads origin "${branch}" > /dev/null 2>&1; then
+            echo "Branch ${branch} already exists; refusing to create a duplicate PR."
+            exit 1
+          fi
+
+          git switch -c "${branch}"
+          git config user.name "opencode[bot]"
+          git config user.email "opencode[bot]@users.noreply.github.com"
+          git add package.json package-lock.json client/package.json client/package-lock.json
+          git commit -m "fix(deps): resolve ${PACKAGE} vulnerability"
+          git push -u origin "${branch}"
+          gh pr create \
+            --base master \
+            --head "${branch}" \
+            --title "Fix ${PACKAGE} Dependabot alerts" \
+            --body-file .scratch/dependabot-pr-body.md

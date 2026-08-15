@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+expected_package="${1:?expected package is required}"
+expected_alerts="${2:?expected alert CSV is required}"
+result_file=".scratch/dependabot-result.json"
+body_file=".scratch/dependabot-pr-body.md"
+alerts_file=".scratch/dependabot-alerts.json"
+
+if [[ ! "${expected_package}" =~ ^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$ ]]; then
+  echo "invalid npm package name: ${expected_package}" >&2
+  exit 2
+fi
+
+jq -e . "${result_file}" > /dev/null
+jq -e . "${alerts_file}" > /dev/null
+
+if ! jq -e --arg package "${expected_package}" '
+  length > 0 and all(
+    .state == "open" and
+    .dependency.package.ecosystem == "npm" and
+    .dependency.package.name == $package and
+    .security_vulnerability.first_patched_version.identifier != null
+  )
+' "${alerts_file}" > /dev/null; then
+  echo "alert input is not a valid open npm alert group for ${expected_package}" >&2
+  exit 1
+fi
+
+input_alerts="$(jq -r 'map(.number) | sort | map(tostring) | join(",")' "${alerts_file}")"
+sorted_expected_alerts="$(jq -Rr 'split(",") | map(tonumber) | sort | map(tostring) | join(",")' <<< "${expected_alerts}")"
+if [[ "${input_alerts}" != "${sorted_expected_alerts}" ]]; then
+  echo "alert input numbers do not match expected alerts" >&2
+  exit 1
+fi
+
+allow_root=false
+allow_client=false
+while IFS= read -r manifest_path; do
+  case "${manifest_path#./}" in
+    package.json|package-lock.json)
+      allow_root=true
+      ;;
+    client/package.json|client/package-lock.json)
+      allow_client=true
+      ;;
+    *)
+      echo "unsupported alert manifest: ${manifest_path}" >&2
+      exit 1
+      ;;
+  esac
+done < <(jq -r '.[].dependency.manifest_path' "${alerts_file}")
+
+unexpected_untracked="$(git ls-files --others --exclude-standard | rg -v '^\.scratch/' || true)"
+if [[ -n "${unexpected_untracked}" ]]; then
+  echo "unexpected untracked files:" >&2
+  echo "${unexpected_untracked}" >&2
+  exit 1
+fi
+
+status="$(jq -r '.status' "${result_file}")"
+package="$(jq -r '.package' "${result_file}")"
+strategy="$(jq -r '.strategy' "${result_file}")"
+
+if [[ "${package}" != "${expected_package}" ]]; then
+  echo "result package does not match expected package" >&2
+  exit 1
+fi
+
+actual_alerts="$(jq -r '.alert_numbers | sort | map(tostring) | join(",")' "${result_file}")"
+if [[ "${actual_alerts}" != "${sorted_expected_alerts}" ]]; then
+  echo "result alert numbers do not match expected alerts" >&2
+  exit 1
+fi
+
+if [[ "${status}" == "blocked" ]]; then
+  if [[ -n "$(git diff --name-only)" ]]; then
+    echo "blocked result must not contain dependency changes" >&2
+    exit 1
+  fi
+  exit 3
+fi
+
+if [[ "${status}" != "ready" || ! "${strategy}" =~ ^[ABC]$ ]]; then
+  echo "result must be ready with strategy A, B, or C" >&2
+  exit 1
+fi
+
+test -s "${body_file}"
+git diff --check
+
+changed_files="$(git diff --name-only)"
+if [[ -z "${changed_files}" ]]; then
+  echo "ready result has no dependency changes" >&2
+  exit 1
+fi
+
+lockfile_seen=false
+manifest_seen=false
+
+while IFS= read -r file; do
+  if [[ "${file}" == client/* ]]; then
+    if [[ "${allow_client}" != true ]]; then
+      echo "alert group does not permit client project changes: ${file}" >&2
+      exit 1
+    fi
+  elif [[ "${allow_root}" != true ]]; then
+    echo "alert group does not permit root project changes: ${file}" >&2
+    exit 1
+  fi
+
+  case "${file}" in
+    package-lock.json|client/package-lock.json)
+      lockfile_seen=true
+      old_version="$(git show "HEAD:${file}" | jq -r '.lockfileVersion')"
+      new_version="$(jq -r '.lockfileVersion' "${file}")"
+      if [[ "${old_version}" != "${new_version}" ]]; then
+        echo "lockfile format changed in ${file}: ${old_version} -> ${new_version}" >&2
+        exit 1
+      fi
+      ;;
+    package.json|client/package.json)
+      manifest_seen=true
+      if [[ "${strategy}" == "A" ]]; then
+        echo "strategy A may not change ${file}" >&2
+        exit 1
+      fi
+
+      if [[ "${strategy}" == "B" ]]; then
+        original_non_dependencies="$(git show "HEAD:${file}" | jq -S 'del(.dependencies, .devDependencies, .optionalDependencies)')"
+        current_non_dependencies="$(jq -S 'del(.dependencies, .devDependencies, .optionalDependencies)' "${file}")"
+        if [[ "${original_non_dependencies}" != "${current_non_dependencies}" ]]; then
+          echo "strategy B may change only dependency sections in ${file}" >&2
+          exit 1
+        fi
+      else
+        original_without_overrides="$(git show "HEAD:${file}" | jq -S 'del(.overrides)')"
+        current_without_overrides="$(jq -S 'del(.overrides)' "${file}")"
+        if [[ "${original_without_overrides}" != "${current_without_overrides}" ]]; then
+          echo "strategy C may change only overrides in ${file}" >&2
+          exit 1
+        fi
+      fi
+      ;;
+    *)
+      echo "changed disallowed file: ${file}" >&2
+      exit 1
+      ;;
+  esac
+done <<< "${changed_files}"
+
+if [[ "${lockfile_seen}" != true ]]; then
+  echo "every ready strategy must change an npm lockfile" >&2
+  exit 1
+fi
+
+if [[ "${strategy}" == "C" && "${manifest_seen}" != true ]]; then
+  echo "strategy C must add an override to a package manifest" >&2
+  exit 1
+fi
+
+if rg -q '^package\.json$' <<< "${changed_files}" && ! rg -q '^package-lock\.json$' <<< "${changed_files}"; then
+  echo "root package.json changed without package-lock.json" >&2
+  exit 1
+fi
+
+if rg -q '^client/package\.json$' <<< "${changed_files}" && ! rg -q '^client/package-lock\.json$' <<< "${changed_files}"; then
+  echo "client/package.json changed without client/package-lock.json" >&2
+  exit 1
+fi
+
+for heading in "## Summary" "## Dependabot alerts" "## Changes" "## Risk" "## Verification"; do
+  rg -F "${heading}" "${body_file}" > /dev/null
+done
+
+while IFS= read -r alert_url; do
+  rg -F "${alert_url}" "${body_file}" > /dev/null
+done < <(jq -r '.[].html_url' "${alerts_file}")
+
+while IFS= read -r ghsa; do
+  rg -F "https://github.com/advisories/${ghsa}" "${body_file}" > /dev/null
+done < <(jq -r '.[].security_advisory.ghsa_id' "${alerts_file}")

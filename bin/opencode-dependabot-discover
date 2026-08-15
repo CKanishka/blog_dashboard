@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repo="${GITHUB_REPOSITORY:-CKanishka/blog_dashboard}"
+requested_alert="${1:-}"
+max_groups="${OPENCODE_DEPENDABOT_MAX_GROUPS:-1}"
+
+if [[ -n "${requested_alert}" && ! "${requested_alert}" =~ ^[0-9]+$ ]]; then
+  echo "alert number must be numeric" >&2
+  exit 2
+fi
+
+if [[ ! "${max_groups}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "OPENCODE_DEPENDABOT_MAX_GROUPS must be a positive integer" >&2
+  exit 2
+fi
+
+: "${DEPENDABOT_ALERTS_TOKEN:?DEPENDABOT_ALERTS_TOKEN is required}"
+: "${GITHUB_TOKEN:?GITHUB_TOKEN is required}"
+
+alerts_file="$(mktemp)"
+normalized_file="$(mktemp)"
+trap 'rm -f "${alerts_file}" "${normalized_file}"' EXIT
+
+if [[ -n "${requested_alert}" ]]; then
+  GH_TOKEN="${DEPENDABOT_ALERTS_TOKEN}" gh api \
+    "repos/${repo}/dependabot/alerts/${requested_alert}" > "${alerts_file}"
+  jq -s '.' "${alerts_file}" > "${normalized_file}"
+else
+  GH_TOKEN="${DEPENDABOT_ALERTS_TOKEN}" gh api --paginate \
+    "repos/${repo}/dependabot/alerts?state=open&ecosystem=npm&per_page=100" \
+    --jq '.[]' > "${alerts_file}"
+  jq -s '.' "${alerts_file}" > "${normalized_file}"
+fi
+
+candidate_groups="$(jq -c '
+  def severity_rank:
+    if . == "critical" then 0
+    elif . == "high" then 1
+    elif . == "medium" then 2
+    elif . == "low" then 3
+    else 4
+    end;
+
+  map(select(
+    .state == "open" and
+    .dependency.package.ecosystem == "npm" and
+    ((.dependency.manifest_path // "") | test("(^|/)(package\\.json|package-lock\\.json)$")) and
+    .security_vulnerability.first_patched_version.identifier != null
+  ))
+  | sort_by(.dependency.package.name)
+  | group_by(.dependency.package.name)
+  | map({
+      package: .[0].dependency.package.name,
+      alerts: sort_by(.number),
+      severity_rank: (map(.security_vulnerability.severity | severity_rank) | min),
+      scope_rank: (map(if .dependency.scope == "runtime" then 0 else 1 end) | min),
+      created_at: (map(.created_at) | min)
+    })
+  | sort_by(.severity_rank, .scope_rank, .created_at, .package)
+  | .[]
+' "${normalized_file}")"
+
+matrix='{"include":[]}'
+selected=0
+
+while IFS= read -r group; do
+  [[ -z "${group}" ]] && continue
+
+  unlinked_alerts='[]'
+  while IFS= read -r alert_number; do
+    linked_count="$(
+      GH_TOKEN="${GITHUB_TOKEN}" gh pr list \
+        --repo "${repo}" \
+        --state all \
+        --search "security/dependabot/${alert_number} in:body" \
+        --limit 20 \
+        --json state,mergedAt \
+        --jq 'map(select(.state == "OPEN" or .mergedAt != null)) | length'
+    )"
+
+    if [[ "${linked_count}" == "0" ]]; then
+      unlinked_alerts="$(jq -cn --argjson alerts "${unlinked_alerts}" --argjson number "${alert_number}" '$alerts + [$number]')"
+    fi
+  done < <(jq -r '.alerts[].number' <<< "${group}")
+
+  if [[ "$(jq 'length' <<< "${unlinked_alerts}")" == "0" ]]; then
+    continue
+  fi
+
+  package="$(jq -r '.package' <<< "${group}")"
+  primary_alert="$(jq 'min' <<< "${unlinked_alerts}")"
+  alert_csv="$(jq -r 'map(tostring) | join(",")' <<< "${unlinked_alerts}")"
+
+  matrix="$(
+    jq -cn \
+      --argjson matrix "${matrix}" \
+      --arg package "${package}" \
+      --arg alerts "${alert_csv}" \
+      --argjson primary_alert "${primary_alert}" \
+      '$matrix | .include += [{package: $package, alerts: $alerts, primary_alert: $primary_alert}]'
+  )"
+
+  selected=$((selected + 1))
+  if [[ "${selected}" -ge "${max_groups}" ]]; then
+    break
+  fi
+done <<< "${candidate_groups}"
+
+jq -c '.' <<< "${matrix}"
