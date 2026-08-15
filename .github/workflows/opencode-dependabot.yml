@@ -104,7 +104,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         with:
           agent: dependabot-fixer
-          model: ${{ vars.OPENCODE_DEPENDABOT_MODEL || 'gpt-5.4-mini' }}
+          model: ${{ vars.OPENCODE_DEPENDABOT_MODEL || 'openai/gpt-5.4-mini' }}
           use_github_token: true
           prompt: |
             Prepare the npm Dependabot remediation described by .scratch/dependabot-alerts.json.
