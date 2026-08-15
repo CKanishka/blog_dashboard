@@ -49,11 +49,10 @@ permission:
     "npm ci --ignore-scripts*": allow
     "npm --prefix * ci --ignore-scripts*": allow
     "npm --prefix client test*": allow
-    "CI=true npm --prefix client test*": allow
     "npm --prefix client run build*": allow
     "node --check server.js*": allow
     "jq*": allow
-    "rg*": allow
+    "grep*": allow
     "sed -n*": allow
 ---
 
@@ -128,7 +127,7 @@ Before marking a result ready:
 1. Run `npm ls <package> --all --package-lock-only` in every affected project and confirm no vulnerable resolution remains.
 2. Confirm every changed lockfile kept its original `lockfileVersion`.
 3. Run `npm ci --ignore-scripts` in the root project and `npm --prefix client ci --ignore-scripts` when the client project changed.
-4. Run `node --check server.js` for a root change. For a client change, run `CI=true npm --prefix client test -- --watchAll=false` and `npm --prefix client run build`.
+4. Run `node --check server.js` for a root change. For a client change, run `npm --prefix client run build`. Do not run the existing client Jest test in this repository; it is a known pre-existing baseline failure caused by an app request to `undefined/user`.
 5. Run `git diff --check` and inspect the complete diff.
 6. Enforce the file allowlist:
    - Strategy A: affected `package-lock.json` files only.

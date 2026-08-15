@@ -52,7 +52,7 @@ while IFS= read -r manifest_path; do
   esac
 done < <(jq -r '.[].dependency.manifest_path' "${alerts_file}")
 
-unexpected_untracked="$(git ls-files --others --exclude-standard | rg -v '^\.scratch/' || true)"
+unexpected_untracked="$(git ls-files --others --exclude-standard | grep -Ev '^\.scratch/' || true)"
 if [[ -n "${unexpected_untracked}" ]]; then
   echo "unexpected untracked files:" >&2
   echo "${unexpected_untracked}" >&2
@@ -160,24 +160,24 @@ if [[ "${strategy}" == "C" && "${manifest_seen}" != true ]]; then
   exit 1
 fi
 
-if rg -q '^package\.json$' <<< "${changed_files}" && ! rg -q '^package-lock\.json$' <<< "${changed_files}"; then
+if grep -qx 'package.json' <<< "${changed_files}" && ! grep -qx 'package-lock.json' <<< "${changed_files}"; then
   echo "root package.json changed without package-lock.json" >&2
   exit 1
 fi
 
-if rg -q '^client/package\.json$' <<< "${changed_files}" && ! rg -q '^client/package-lock\.json$' <<< "${changed_files}"; then
+if grep -qx 'client/package.json' <<< "${changed_files}" && ! grep -qx 'client/package-lock.json' <<< "${changed_files}"; then
   echo "client/package.json changed without client/package-lock.json" >&2
   exit 1
 fi
 
 for heading in "## Summary" "## Dependabot alerts" "## Changes" "## Risk" "## Verification"; do
-  rg -F "${heading}" "${body_file}" > /dev/null
+  grep -F "${heading}" "${body_file}" > /dev/null
 done
 
 while IFS= read -r alert_url; do
-  rg -F "${alert_url}" "${body_file}" > /dev/null
+  grep -F "${alert_url}" "${body_file}" > /dev/null
 done < <(jq -r '.[].html_url' "${alerts_file}")
 
 while IFS= read -r ghsa; do
-  rg -F "https://github.com/advisories/${ghsa}" "${body_file}" > /dev/null
+  grep -F "https://github.com/advisories/${ghsa}" "${body_file}" > /dev/null
 done < <(jq -r '.[].security_advisory.ghsa_id' "${alerts_file}")
