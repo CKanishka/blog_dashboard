@@ -22,7 +22,7 @@ The repository has independent root and `client/` npm projects. The agent change
 
 ## Security model
 
-OpenCode runs in a read-only GitHub job and never receives repository write credentials or the Dependabot API token. It cannot commit, push, create a PR, dismiss alerts, or merge changes.
+OpenCode runs through the CLI in a read-only GitHub job and never receives repository write credentials or the Dependabot API token. It cannot commit, push, create a PR, dismiss alerts, or merge changes.
 
 The prepared patch is structurally validated and transferred as a short-lived artifact. A separate job with no model credentials applies it to a clean checkout, repeats validation and tests, and performs deterministic Git and GitHub commands.
 
@@ -72,8 +72,10 @@ Create these Actions secrets:
 Optional repository variables:
 
 - `OPENCODE_DEPENDABOT_MODEL`: OpenCode model identifier. Defaults to `openai/gpt-5.4-mini`.
+- `OPENCODE_CLI_VERSION`: OpenCode CLI npm package version. Defaults to `1.18.18`.
 
-Both local runs and the GitHub Action expect the provider-qualified OpenCode form such as `openai/gpt-5.4-mini`.
+Both local runs and CI use the provider-qualified OpenCode form such as `openai/gpt-5.4-mini`.
+
 - `OPENCODE_DEPENDABOT_ENABLED=true`: enables scheduled polling. Manual workflow runs remain available when this variable is absent.
 
 The schedule processes at most one unlinked package group per run, prioritizing critical and high-severity runtime alerts. Branches use `dependabot-<alert-number>-upgrade-<package>`.
