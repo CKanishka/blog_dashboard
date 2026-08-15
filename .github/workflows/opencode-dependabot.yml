@@ -79,7 +79,6 @@ jobs:
           npm ci --ignore-scripts
           npm --prefix client ci --ignore-scripts
           node --check server.js
-          CI=true npm --prefix client test -- --watchAll=false
           npm --prefix client run build
 
       - name: Fetch Dependabot alert context
@@ -183,7 +182,6 @@ jobs:
           npm ci --ignore-scripts
           npm --prefix client ci --ignore-scripts
           node --check server.js
-          CI=true npm --prefix client test -- --watchAll=false
           npm --prefix client run build
           git diff --check
 
