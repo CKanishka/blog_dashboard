@@ -71,7 +71,9 @@ Create these Actions secrets:
 
 Optional repository variables:
 
-- `OPENCODE_DEPENDABOT_MODEL`: OpenCode model identifier. Defaults to `openai/gpt-5.4-mini`.
+- `OPENCODE_DEPENDABOT_MODEL`: OpenCode GitHub Action model identifier. Defaults to `gpt-5.4-mini`.
+
+For local runs, use the provider-qualified OpenCode CLI form such as `openai/gpt-5.4-mini`. The GitHub Action expects the shorter model id such as `gpt-5.4-mini`.
 - `OPENCODE_DEPENDABOT_ENABLED=true`: enables scheduled polling. Manual workflow runs remain available when this variable is absent.
 
 The schedule processes at most one unlinked package group per run, prioritizing critical and high-severity runtime alerts. Branches use `dependabot-<alert-number>-upgrade-<package>`.
